@@ -277,7 +277,6 @@ MonoBehaviour:
   m_Name: Standalone
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -7346454290989563838}
   - {fileID: 1482542829603258263}
   - {fileID: -6191322494903106382}
   - {fileID: -1152529155333571062}
@@ -289,6 +288,7 @@ MonoBehaviour:
   - {fileID: 8992953979653188080}
   - {fileID: 4066185792696818418}
   - {fileID: 469762324143910399}
+  - {fileID: -7346454290989563838}
   - {fileID: -5479176575344897194}
   - {fileID: -6712205587051211131}
   - {fileID: -2659466057024198005}
@@ -531,11 +531,11 @@ MonoBehaviour:
   m_Name: MetaQuestTouchPlusControllerProfile Metro
   m_EditorClassIdentifier: 
   m_enabled: 0
-  nameUi: 
-  version: 
-  featureIdInternal: 
-  openxrExtensionStrings: 
-  company: 
+  nameUi: Meta Quest Touch Plus Controller Profile
+  version: 0.0.1
+  featureIdInternal: com.unity.openxr.feature.input.metaquestplus
+  openxrExtensionStrings: XR_META_touch_controller_plus
+  company: Unity
   priority: 0
   required: 0
 --- !u!114 &-1152529155333571062
@@ -611,7 +611,6 @@ MonoBehaviour:
   m_Name: Metro
   m_EditorClassIdentifier: 
   features:
-  - {fileID: -4491050556381620653}
   - {fileID: 6481217896900730602}
   - {fileID: 5588413391030492709}
   - {fileID: -2792356232457362833}
@@ -619,10 +618,11 @@ MonoBehaviour:
   - {fileID: -578682496775714839}
   - {fileID: -2761638623604389606}
   - {fileID: -5705736430218370171}
-  - {fileID: 477966452968401654}
   - {fileID: -6706798930674689713}
+  - {fileID: 477966452968401654}
   - {fileID: -2471851026440577446}
   - {fileID: 8402674677180395831}
+  - {fileID: -1159747964004378815}
   - {fileID: -1559569229114809264}
   - {fileID: 5758215005158597580}
   - {fileID: -695209636313066213}
@@ -633,6 +633,7 @@ MonoBehaviour:
   - {fileID: -5767812223494721938}
   - {fileID: 3144667196572844340}
   - {fileID: 5030616298339476199}
+  - {fileID: -4491050556381620653}
   m_renderMode: 1
   m_autoColorSubmissionMode: 1
   m_colorSubmissionModes:
@@ -863,7 +864,8 @@ MonoBehaviour:
   version: 1
   featureIdInternal: com.unity.openxr.feature.foveatedrendering
   openxrExtensionStrings: XR_UNITY_foveation XR_FB_foveation XR_FB_foveation_configuration
-    XR_FB_swapchain_update_state XR_FB_foveation_vulkan
+    XR_FB_swapchain_update_state XR_FB_foveation_vulkan XR_META_foveation_eye_tracked
+    XR_META_vulkan_swapchain_create_info
   company: Unity
   priority: 0
   required: 0
