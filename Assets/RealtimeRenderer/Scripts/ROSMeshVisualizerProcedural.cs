@@ -175,7 +175,7 @@ namespace RealtimeRenderer
           inputA[i] = 1f;
         }
       }
-
+      //TODO Ist ConvertRosToNativeJob nicht überflüssig, weil ich doch schon eimal über die vertexCount iterriere und damit auch einfach die float3 erzeugen könnte?
       var job = new ConvertRosToNativeJob
       {
         inputX = inputX,
@@ -189,7 +189,7 @@ namespace RealtimeRenderer
         outputPositions = positionsNative,
         outputColors = colorsNative
       };
-
+      // TODO Was mach das hier ?
       conversionJobHandle = job.Schedule(vertexCount, 128);
       conversionJobHandle = inputX.Dispose(conversionJobHandle);
       conversionJobHandle = inputY.Dispose(conversionJobHandle);
