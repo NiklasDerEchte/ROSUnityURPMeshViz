@@ -37,7 +37,8 @@ namespace RealtimeRenderer
     public bool enableLogs = true;
 
     private ROSConnection rosConnection;
-    private Queue<Float32MultiArrayMsg> messageQueue = new Queue<Float32MultiArrayMsg>();
+    private Queue<QueuedMessage> messageQueue = new Queue<QueuedMessage>();
+    private int messageSeq;
 
     private GraphicsBuffer[] positionBuffers = new GraphicsBuffer[2];
     private GraphicsBuffer[] colorBuffers = new GraphicsBuffer[2];
@@ -50,6 +51,8 @@ namespace RealtimeRenderer
 
     private int pendingVertexCount = 0;
     private int pendingBufferIndex = 0;
+    private long pendingReceivedTicks;
+    private int pendingSeq;
 
     private int currentVertexCount = 0;
     private Bounds localBounds = new Bounds(Vector3.zero, Vector3.one * 10f);
@@ -57,7 +60,7 @@ namespace RealtimeRenderer
     private Material material;
     private static readonly int LocalToWorldId = Shader.PropertyToID("_LocalToWorld");
 
-    private float meshProcessStartTime = -1f;
+    private long meshProcessStartTicks = -1;
 
     void Start()
     {
@@ -110,8 +113,14 @@ namespace RealtimeRenderer
       if (msg == null || msg.data == null || msg.data.Length == 0)
         return;
 
-      messageQueue.Enqueue(msg);
-      Log($"Neue Nachricht. Queue: {messageQueue.Count}");
+      int seq = ++messageSeq;
+      messageQueue.Enqueue(new QueuedMessage
+      {
+        msg = msg,
+        receivedTicks = System.Diagnostics.Stopwatch.GetTimestamp(),
+        seq = seq
+      });
+      Log(seq, $"Neue Nachricht. Queue: {messageQueue.Count}");
     }
 
     void Update()
@@ -124,28 +133,33 @@ namespace RealtimeRenderer
 
       conversionJobHandle.Complete();
 
-      var msg = messageQueue.Dequeue();
-      float[] data = msg.data;
+      QueuedMessage queued = messageQueue.Dequeue();
+      float[] data = queued.msg.data;
+      double waitMs = TicksToMs(System.Diagnostics.Stopwatch.GetTimestamp() - queued.receivedTicks);
 
       if (data == null || data.Length < FloatsPerVertex * 3)
       {
-        Log($"Ungültig: zu wenig Daten ({(data == null ? 0 : data.Length)}). Queue: {messageQueue.Count}");
+        Log(queued.seq, $"Ungültig: zu wenig Daten ({(data == null ? 0 : data.Length)}). Queue: {messageQueue.Count}. Wartezeit: {waitMs:F1} ms");
         return;
       }
 
       if (data.Length % FloatsPerVertex != 0)
       {
-        Log($"Ungültig: Länge {data.Length} nicht durch {FloatsPerVertex} teilbar. Queue: {messageQueue.Count}");
+        Log(queued.seq, $"Ungültig: Länge {data.Length} nicht durch {FloatsPerVertex} teilbar. Queue: {messageQueue.Count}. Wartezeit: {waitMs:F1} ms");
         return;
       }
 
-      int vertexCount = data.Length / FloatsPerVertex;
-      vertexCount = Mathf.Min(vertexCount, maxVertices);
+      int originalVertexCount = data.Length / FloatsPerVertex;
+      int vertexCount = Mathf.Min(originalVertexCount, maxVertices);
       vertexCount -= vertexCount % 3;
+
+      // Kürzung verwirft Vertices, daher auch ohne enableLogs.
+      if (originalVertexCount > maxVertices)
+        Debug.LogWarning($"[ROS Mesh FA] #{queued.seq} auf maxVertices gekürzt: {originalVertexCount} -> {vertexCount} Vertices");
 
       if (vertexCount < 3)
       {
-        Log($"Ungültig: zu wenige Vertices ({vertexCount}). Queue: {messageQueue.Count}");
+        Log(queued.seq, $"Ungültig: zu wenige Vertices ({vertexCount}). Queue: {messageQueue.Count}. Wartezeit: {waitMs:F1} ms");
         return;
       }
 
@@ -165,9 +179,11 @@ namespace RealtimeRenderer
 
       pendingVertexCount = vertexCount;
       pendingBufferIndex = (currentBufferIndex + 1) % 2;
-      meshProcessStartTime = Time.realtimeSinceStartup;
+      pendingReceivedTicks = queued.receivedTicks;
+      pendingSeq = queued.seq;
+      meshProcessStartTicks = System.Diagnostics.Stopwatch.GetTimestamp();
 
-      Log($"Gültig: Vertices={vertexCount}. Queue: {messageQueue.Count}");
+      Log(queued.seq, $"Gültig: Vertices={vertexCount}. Queue: {messageQueue.Count}. Wartezeit: {waitMs:F1} ms");
     }
 
     void LateUpdate()
@@ -190,11 +206,13 @@ namespace RealtimeRenderer
 
         pendingVertexCount = 0;
 
-        float ms = meshProcessStartTime >= 0f
-          ? (Time.realtimeSinceStartup - meshProcessStartTime) * 1000f
-          : 0f;
-        meshProcessStartTime = -1f;
-        Log($"Mesh fertig: {count} Vertices in {ms:F1} ms");
+        long nowTicks = System.Diagnostics.Stopwatch.GetTimestamp();
+        double ms = meshProcessStartTicks >= 0
+          ? TicksToMs(nowTicks - meshProcessStartTicks)
+          : 0d;
+        double sinceReceiveMs = TicksToMs(nowTicks - pendingReceivedTicks);
+        meshProcessStartTicks = -1;
+        Log(pendingSeq, $"Mesh fertig: {count} Vertices in {ms:F1} ms, seit Empfang {sinceReceiveMs:F1} ms");
       }
 
       if (currentVertexCount <= 0 || material == null)
@@ -246,11 +264,16 @@ namespace RealtimeRenderer
         rosConnection.Unsubscribe(rosTopicName);
     }
 
-    private void Log(string message)
+    private void Log(int seq, string message)
     {
       if (!enableLogs)
         return;
-      Debug.Log($"[ROS Mesh FA] {message}");
+      Debug.Log($"[ROS Mesh FA] #{seq} {message}");
+    }
+
+    private static double TicksToMs(long ticks)
+    {
+      return ticks * (1000.0 / System.Diagnostics.Stopwatch.Frequency);
     }
 
     private static Bounds ComputeLocalBounds(NativeArray<float3> positions, int count)
@@ -288,6 +311,13 @@ namespace RealtimeRenderer
         Mathf.Abs(axisX.z) + Mathf.Abs(axisY.z) + Mathf.Abs(axisZ.z)
       );
       return new Bounds(center, worldExt * 2f);
+    }
+
+    private struct QueuedMessage
+    {
+      public Float32MultiArrayMsg msg;
+      public long receivedTicks;
+      public int seq;
     }
 
     [BurstCompile]
